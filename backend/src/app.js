@@ -11,13 +11,12 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+app.use(documentRoutes);
 
 // Endpoint de verificação de saúde.
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
-
-app.use(documentRoutes);
 
 if (require.main === module) {
   app.listen(PORT, () => {

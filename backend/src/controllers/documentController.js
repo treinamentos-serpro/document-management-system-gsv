@@ -4,34 +4,42 @@
 const documentService = require('../services/documentService');
 
 function upload(req, res) {
-  if (!req.file) {
-    return res.status(400).json({ erro: 'Nenhum arquivo foi enviado' });
-  }
+  const file = req.file;
 
-  const document = documentService.registerUpload(req.file, req.body.owner);
-  return res.status(201).json(document);
+  try {
+    const document = documentService.uploadDocument(file, req.body?.owner || 'anonymous');
+    return res.status(201).json(document);
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      message: error.message || 'Erro ao enviar documento.',
+    });
+  }
 }
 
-function list(req, res) {
-  const documents = documentService.listDocuments(req.query.owner);
+function listDocuments(req, res) {
+  const documents = documentService.listDocuments();
   return res.status(200).json(documents);
 }
 
 function download(req, res) {
-  const result = documentService.getDocumentForDownload(req.params.id);
-  if (!result) {
-    return res.status(404).json({ erro: 'Documento não encontrado' });
+  const { id } = req.params;
+  const document = documentService.getDocumentById(id);
+
+  if (!document) {
+    return res.status(404).json({ message: 'Documento não encontrado.' });
   }
 
-  return res.download(result.filePath, result.document.originalName, (err) => {
-    if (err && !res.headersSent) {
-      res.status(500).json({ erro: 'Falha ao ler o arquivo do documento' });
+  return res.download(document.filePath, document.originalName, (error) => {
+    if (error && !res.headersSent) {
+      return res.status(500).json({ message: 'Erro ao baixar documento.' });
     }
+
+    return undefined;
   });
 }
 
 module.exports = {
   upload,
-  list,
+  listDocuments,
   download,
 };
