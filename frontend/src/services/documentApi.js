@@ -7,8 +7,19 @@ async function request(path, options = {}) {
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || 'Erro ao comunicar com o backend.');
+    let errorMessage = `Erro ${response.status}`;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.message || errorData.erro || errorMessage;
+    } catch {
+      try {
+        const errorText = await response.text();
+        if (errorText) errorMessage = errorText;
+      } catch {
+        // Fallback mantém a mensagem padronizada
+      }
+    }
+    throw new Error(errorMessage);
   }
 
   return response;

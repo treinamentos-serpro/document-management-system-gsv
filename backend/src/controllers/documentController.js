@@ -1,6 +1,7 @@
 // Controllers: tratam entrada/saída HTTP e validação básica, delegando as
 // regras de negócio para a camada de serviço.
 
+const path = require('node:path');
 const documentService = require('../services/documentService');
 
 function upload(req, res) {
@@ -17,7 +18,7 @@ function upload(req, res) {
 }
 
 function listDocuments(req, res) {
-  const documents = documentService.listDocuments();
+  const documents = documentService.listDocuments(req.query?.owner);
   return res.status(200).json(documents);
 }
 
@@ -29,7 +30,9 @@ function download(req, res) {
     return res.status(404).json({ message: 'Documento não encontrado.' });
   }
 
-  return res.download(document.filePath, document.originalName, (error) => {
+  const safeFileName = path.basename(document.originalName || 'download');
+
+  return res.download(document.filePath, safeFileName, (error) => {
     if (error && !res.headersSent) {
       return res.status(500).json({ message: 'Erro ao baixar documento.' });
     }

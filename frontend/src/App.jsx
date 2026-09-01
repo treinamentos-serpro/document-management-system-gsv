@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import UploadComponent from './components/UploadComponent.jsx';
 import DocumentList from './components/DocumentList.jsx';
-import { listDocuments, uploadDocument } from './services/documentApi.js';
+import { listDocuments } from './services/documentApi.js';
 
 export default function App() {
   const [documents, setDocuments] = useState([]);
@@ -22,8 +22,7 @@ export default function App() {
     }
   }
 
-  async function handleUpload(file, owner) {
-    await uploadDocument(file, owner);
+  async function handleUploadSuccess() {
     await fetchDocuments();
   }
 
@@ -39,7 +38,7 @@ export default function App() {
           <p style={styles.subtitle}>Upload, listagem e download de arquivos</p>
         </header>
 
-        <UploadComponent onUploadSuccess={handleUpload} />
+        <UploadComponent onUploadSuccess={handleUploadSuccess} />
 
         {error ? <p style={styles.error}>{error}</p> : null}
 

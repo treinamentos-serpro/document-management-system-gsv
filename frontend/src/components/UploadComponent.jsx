@@ -19,11 +19,11 @@ export default function UploadComponent({ onUploadSuccess }) {
     setError('');
 
     try {
-      await uploadDocument(file, owner || 'anonymous');
+      const uploadedDoc = await uploadDocument(file, owner || 'anonymous');
       setFile(null);
       setOwner('anonymous');
       event.target.reset();
-      await onUploadSuccess?.(file, owner || 'anonymous');
+      await onUploadSuccess?.(uploadedDoc);
     } catch (uploadError) {
       setError(uploadError.message || 'Não foi possível enviar o arquivo.');
     } finally {
