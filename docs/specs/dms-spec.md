@@ -1,133 +1,285 @@
-# Especificação - Document Management System
+# Especificação do Document Management System (DMS)
 
 ## 1. Objetivo
 
-Prover um sistema web simples para upload, listagem e download de documentos,
-com armazenamento estritamente local e gestão básica por usuário.
+O sistema deve permitir que usuários cadastrem, consultem e baixem documentos de forma simples e confiável, mantendo arquivos localmente no filesystem da aplicação e metadados em memória durante esta fase inicial.
 
 ## 2. Escopo
 
 ### Dentro do escopo
 
-- Upload de documentos (multipart/form-data)
-- Listagem dos documentos enviados
+- Upload de documentos em formato de arquivo
+- Listagem dos documentos cadastrados
 - Download de um documento pelo identificador
-- Associação de cada documento a um usuário (owner) simples, sem autenticação real
+- Registro de metadados do documento (nome original, tamanho, data de upload e dono)
+- Persistência local do arquivo em `backend/storage`
+- Organização do backend em camadas seguindo Clean Architecture simples
+- Suporte básico de validação de entrada HTTP e tratamento de erros
 
 ### Fora do escopo
 
-- Armazenamento externo ou em nuvem (S3, etc.)
-- Versionamento de documentos
-- Autenticação/autorização completa (login, senha, sessões)
-- Edição ou exclusão de documentos
-- Persistência em banco de dados (fase inicial usa memória)
+- Armazenamento em nuvem, S3 ou qualquer provedor externo
+- Controle de permissões por perfil ou papel do usuário
+- Versionamento de arquivos
+- Busca avançada por conteúdo do documento
+- Compartilhamento público ou links temporários
+- Multi-tenancy com banco de dados externo
 
 ## 3. Requisitos funcionais
 
-| ID    | Requisito                                                                               |
-| ----- | ---------------------------------------------------------------------------------------- |
-| RF-01 | O usuário pode enviar um documento via `POST /upload`                                    |
-| RF-02 | O usuário pode listar os documentos enviados via `GET /documents`                        |
-| RF-03 | O usuário pode baixar um documento pelo identificador via `GET /documents/:id/download`  |
-| RF-04 | O sistema deve rejeitar upload sem arquivo anexado, retornando erro claro                |
-| RF-05 | O sistema deve retornar 404 ao tentar baixar um documento inexistente                    |
-| RF-06 | Cada documento listado deve exibir nome original, tamanho e data de upload               |
+| ID | Requisito |
+| --- | --- |
+| RF-01 | O sistema deve permitir o upload de um arquivo para o armazenamento local. |
+| RF-02 | O sistema deve rejeitar requisições de upload sem arquivo ou com payload inválido. |
+| RF-03 | O sistema deve gerar um identificador único para cada documento enviado. |
+| RF-04 | O sistema deve registrar o nome original do arquivo, o tamanho em bytes, a data de upload e o dono do documento. |
+| RF-05 | O sistema deve listar todos os documentos persistidos em memória. |
+| RF-06 | O sistema deve permitir a consulta de um documento por identificador. |
+| RF-07 | O sistema deve disponibilizar o download do arquivo físico correspondente ao documento. |
+| RF-08 | O sistema deve retornar erro 404 quando o documento solicitado não existe. |
+| RF-09 | O sistema deve responder com 400 quando a requisição de upload não contém um arquivo válido. |
+| RF-10 | O sistema deve manter o comportamento mínimo de saúde do backend via endpoint `/health`. |
 
 ## 4. Requisitos não funcionais
 
-| ID     | Requisito                                                                    |
-| ------ | ----------------------------------------------------------------------------- |
-| RNF-01 | Arquivos gravados no filesystem local via `multer` com `diskStorage`, na pasta `backend/storage` |
-| RNF-02 | Metadados dos documentos mantidos em memória nesta fase (sem banco de dados)  |
-| RNF-03 | Configuração via variáveis de ambiente (12-Factor), ex.: `PORT`, diretório de storage |
-| RNF-04 | Backend organizado em Clean Architecture simples: routes → controllers → services → repositories |
-| RNF-05 | Erros tratados nos limites do sistema (entrada HTTP, leitura/escrita de arquivos) |
-| RNF-06 | Mensagens ao usuário e comentários de código em português; nomes de símbolos em inglês |
+| ID | Requisito |
+| --- | --- |
+| RNF-01 | Os arquivos devem ser armazenados localmente no filesystem da aplicação, na pasta `backend/storage`, usando `multer` com `diskStorage`. |
+| RNF-02 | Os metadados devem ser mantidos em memória durante esta fase, sem persistência em banco de dados. |
+| RNF-03 | A configuração de ambiente deve seguir princípios 12-Factor e permitir ajustes por variáveis de ambiente. |
+| RNF-04 | O backend deve seguir a separação por camadas: `routes`, `controllers`, `services` e `repositories`. |
+| RNF-05 | O código deve priorizar simplicidade, legibilidade e manutenção, sem overengineering. |
+| RNF-06 | O sistema deve tratar erros de leitura/escrita de arquivos de forma segura e previsível. |
 
-## 5. Modelo de dados (metadados do documento)
+## 5. Modelo de dados
 
-| Campo        | Tipo   | Descrição                                                                      |
-| ------------ | ------ | ------------------------------------------------------------------------------- |
-| id           | string | Identificador único do documento (ex.: uuid)                                    |
-| originalName | string | Nome original do arquivo enviado                                                |
-| storedName   | string | Nome do arquivo gravado em disco (evita colisões)                               |
-| mimeType     | string | Tipo MIME do arquivo                                                            |
-| size         | number | Tamanho em bytes                                                                |
-| uploadedAt   | string | Data/hora do upload (ISO 8601)                                                 |
-| owner        | string | Identificador do usuário dono (enviado no upload, ex.: header ou campo do form) |
+### Entidade Documento
 
-Observação: os metadados residem em memória (ex.: array/Map no repository), reiniciando
-a cada restart do servidor. Os arquivos físicos permanecem em `backend/storage`.
+| Campo | Tipo | Obrigatório | Descrição |
+| --- | --- | --- | --- |
+| id | string | Sim | Identificador único do documento. |
+| originalName | string | Sim | Nome original do arquivo enviado pelo cliente. |
+| storedName | string | Sim | Nome do arquivo salvo no filesystem local. |
+| filePath | string | Sim | Caminho absoluto ou relativo do arquivo armazenado em `backend/storage`. |
+| size | number | Sim | Tamanho em bytes do arquivo. |
+| uploadedAt | string | Sim | Data e hora de upload no formato ISO 8601. |
+| owner | string | Sim | Identificador do usuário dono do documento. |
+| contentType | string | Não | Tipo MIME detectado no upload, quando disponível. |
+
+### Observações
+
+- A referência do arquivo físico deve ser mantida em memória para permitir o download posterior.
+- O identificador do documento deve ser estável e usado nas rotas de consulta e download.
+- A propriedade `owner` pode usar valor padrão como `anonymous` para esta fase inicial, quando o usuário não for informado.
 
 ## 6. Contratos de API
 
-### POST /upload
+### 6.1 Endpoint: `POST /upload`
 
-- Entrada: multipart/form-data com campo `file` (arquivo) e campo `owner` (string, opcional/simples)
-- Sucesso (201): JSON com os metadados do documento criado
+#### Objetivo
 
-  ```json
+Receber um arquivo no formato multipart/form-data e registrar o documento no sistema.
+
+#### Requisição
+
+- Método: `POST`
+- URL: `/upload`
+- Content-Type: `multipart/form-data`
+- Campo obrigatório: `file`
+- Campo opcional: `owner`
+
+Exemplo:
+
+```bash
+curl -X POST http://localhost:3000/upload \
+  -F "file=@documento.pdf" \
+  -F "owner=usuario-123"
+```
+
+#### Resposta de sucesso
+
+- Status: `201 Created`
+- Body:
+
+```json
+{
+  "id": "7f2d7b2e-9bf1-4ec5-a2ae-5c8d7a4a6d9b",
+  "originalName": "documento.pdf",
+  "storedName": "7f2d7b2e-9bf1-4ec5-a2ae-5c8d7a4a6d9b-documento.pdf",
+  "size": 15342,
+  "uploadedAt": "2026-09-01T12:34:56.000Z",
+  "owner": "usuario-123"
+}
+```
+
+#### Resposta de erro
+
+- Status: `400 Bad Request`
+- Body:
+
+```json
+{
+  "message": "Arquivo obrigatório."
+}
+```
+
+### 6.2 Endpoint: `GET /documents`
+
+#### Objetivo
+
+Listar todos os documentos registrados.
+
+#### Requisição
+
+- Método: `GET`
+- URL: `/documents`
+
+#### Resposta de sucesso
+
+- Status: `200 OK`
+- Body:
+
+```json
+[
   {
-    "id": "uuid",
-    "originalName": "contrato.pdf",
-    "mimeType": "application/pdf",
-    "size": 10240,
-    "uploadedAt": "2026-09-01T12:00:00.000Z",
-    "owner": "usuario1"
+    "id": "7f2d7b2e-9bf1-4ec5-a2ae-5c8d7a4a6d9b",
+    "originalName": "documento.pdf",
+    "size": 15342,
+    "uploadedAt": "2026-09-01T12:34:56.000Z",
+    "owner": "usuario-123"
   }
-  ```
+]
+```
 
-- Erros:
-  - 400 quando nenhum arquivo é enviado
+### 6.3 Endpoint: `GET /documents/:id/download`
 
-### GET /documents
+#### Objetivo
 
-- Entrada: nenhuma (opcionalmente filtro por `owner` via query string)
-- Sucesso (200): lista de metadados de documentos
+Baixar o conteúdo físico do documento associado ao identificador informado.
 
-  ```json
-  [
-    { "id": "uuid", "originalName": "contrato.pdf", "size": 10240, "uploadedAt": "...", "owner": "usuario1" }
-  ]
-  ```
+#### Requisição
 
-### GET /documents/:id/download
+- Método: `GET`
+- URL: `/documents/:id/download`
 
-- Entrada: `id` do documento na URL
-- Sucesso (200): conteúdo binário do arquivo, com `Content-Disposition` usando o `originalName`
-- Erros:
-  - 404 quando o `id` não existe
+#### Resposta de sucesso
+
+- Status: `200 OK`
+- Content-Type: definido pelo tipo do arquivo (ou fallback genérico)
+- Body: conteúdo binário do arquivo
+
+#### Resposta de erro
+
+- Status: `404 Not Found`
+- Body:
+
+```json
+{
+  "message": "Documento não encontrado."
+}
+```
+
+### 6.4 Endpoint: `GET /health`
+
+#### Objetivo
+
+Servir como verificação de disponibilidade do backend.
+
+#### Resposta de sucesso
+
+```json
+{
+  "status": "ok"
+}
+```
 
 ## 7. Decisões arquiteturais
 
-- Backend em Clean Architecture simples: `routes/` define endpoints e delega para
-  `controllers/`; `controllers/` trata entrada/saída HTTP e validação básica;
-  `services/` concentra regras de negócio (ex.: gerar id, validar arquivo);
-  `repositories/` cuida da persistência (gravação em disco via multer + metadados em memória).
-- Fluxo de dependência único: routes → controllers → services → repositories (camadas
-  internas não conhecem camadas externas).
-- Frontend em componentes React funcionais com Hooks, organizado em `components/`,
-  `pages/`, `services/`; comunicação via `fetch` usando prefixo `/api` (proxy do Vite).
-- Armazenamento estritamente local: `multer` com `diskStorage` gravando em `backend/storage`;
-  nenhum provedor externo de armazenamento.
+- O backend será implementado em Express com CommonJS.
+- A estrutura será organizada em camadas:
+  - `routes/`: define endpoints e delega para controllers
+  - `controllers/`: trata entrada/saída HTTP e validações básicas
+  - `services/`: concentra regras de negócio
+  - `repositories/`: cuida da persistência em memória e da referência do arquivo local
+- O armazenamento físico será realizado no filesystem local usando `multer` com `diskStorage` e destino fixo em `backend/storage`.
+- Os metadados serão registrados em memória, em um repositório simples, evitando complexidade desnecessária para esta fase.
+- O frontend, se implementado em etapas posteriores, se comunicará com o backend via `fetch` com prefixo `/api` e será organizado por componentes e páginas.
+- Não haverá integração com serviços externos de armazenamento ou banco de dados neste escopo inicial.
 
-## 8. Plano de execução
+## 8. Plano de execução em etapas
 
-1. Backend — camada de repositório: implementar `documentRepository` (metadados em
-   memória) e configuração do `multer` `diskStorage` apontando para `backend/storage`.
-2. Backend — camada de serviço: `documentService` com regras para registrar upload
-   (gerar id, montar metadados) e consultar/baixar documentos.
-3. Backend — camada de controller: `documentController` tratando request/response HTTP
-   e validações básicas (arquivo ausente, id inexistente).
-4. Backend — camada de rotas: registrar `POST /upload`, `GET /documents` e
-   `GET /documents/:id/download` em `routes/`, plugando no `app.js`.
-5. Backend — testes: cobrir os três endpoints com `node:test` (casos de sucesso e erro).
-6. Frontend — serviço de API: criar cliente em `services/` para chamar `/api/upload`,
-   `/api/documents` e `/api/documents/:id/download`.
-7. Frontend — páginas/componentes: página de listagem de documentos e formulário de
-   upload, reutilizando componentes simples.
-8. Frontend — integração final: configurar proxy `/api` no `vite.config.js` (se ainda
-   não configurado) e validar o fluxo completo manualmente.
+### Etapa 1: Definição da especificação e contratos
 
-> Nota: as etapas 1-8 acima são apenas o roteiro documentado na especificação; a
-> implementação de código não faz parte deste documento.
+- Validar objetivos, escopo e restrições do sistema.
+- Registrar requisitos funcionais e não funcionais.
+- Definir modelo de dados e contratos de API esperados.
+- Produzir a especificação em `docs/specs/dms-spec.md`.
+
+Critérios de aceite:
+- Documento de especificação concluído e revisado.
+- Arquitetura e restrições claras antes da implementação.
+
+### Etapa 2: Estrutura do backend em Clean Architecture
+
+- Criar diretórios e arquivos de organização:
+  - `backend/src/routes`
+  - `backend/src/controllers`
+  - `backend/src/services`
+  - `backend/src/repositories`
+- Ajustar o bootstrap do Express em `backend/src/app.js` para registrar as rotas.
+
+Critérios de aceite:
+- Estrutura modular pronta.
+- Fluxo de dependências respeitando `routes -> controllers -> services -> repositories`.
+
+### Etapa 3: Persistência local e metadados em memória
+
+- Configurar `multer` com `diskStorage` apontando para `backend/storage`.
+- Implementar repositório em memória para armazenar documentos e seus metadados.
+- Garantir que o nome do arquivo salvo e o caminho físico sejam rastreáveis.
+
+Critérios de aceite:
+- Arquivos gravados localmente.
+- Metadados preservados em memória.
+- Sem uso de provedores externos.
+
+### Etapa 4: Implementação dos endpoints principais
+
+- `POST /upload`: receber o arquivo e registrar o documento.
+- `GET /documents`: listar todos os documentos.
+- `GET /documents/:id/download`: recuperar o arquivo correspondente.
+- `GET /health`: verificar funcionamento do backend.
+
+Critérios de aceite:
+- Endpoints respondem com os status e payloads esperados.
+- Casos de erro são tratados com mensagens claras.
+
+### Etapa 5: Validação e testes
+
+- Escrever testes de comportamento para upload, listagem e download.
+- Verificar casos de falha, como arquivo ausente ou documento inexistente.
+- Validar a execução do backend localmente com `npm test`.
+
+Critérios de aceite:
+- Testes automatizados passando.
+- Cenários principais cobertos.
+
+### Etapa 6: Preparação para o próximo passo do frontend
+
+- Confirmar que a API atende ao contrato esperado e pode ser consumida pelo frontend.
+- Preparar a base para integração do cliente web em etapas posteriores.
+
+Critérios de aceite:
+- Backend pronto para consumo por interface frontend.
+- Sem alteração de escopo para armazenamento externo ou versionamento.
+
+## 9. Critérios de sucesso do projeto
+
+O projeto será considerado concluído para esta fase quando:
+
+- o backend estiver organizado em camadas;
+- o upload local com `multer` estiver funcionando;
+- a listagem de documentos refletir os metadados em memória;
+- o download do arquivo físico estiver operacional;
+- a API respeitar os contratos descritos acima;
+- os testes relevantes passarem sem regressão funcional.
