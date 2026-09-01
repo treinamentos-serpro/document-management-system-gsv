@@ -1,41 +1,99 @@
-// Lista de documentos enviados, com opção de download por item.
-
-import DownloadButton from './DownloadButton';
+import DownloadButton from './DownloadButton.jsx';
 
 function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   return `${(bytes / 1024).toFixed(1)} KB`;
 }
 
-export default function DocumentList({ documents }) {
-  if (documents.length === 0) {
-    return <p>Nenhum documento enviado ainda.</p>;
+export default function DocumentList({ documents, onRefresh }) {
+  if (!documents.length) {
+    return (
+      <section style={styles.section}>
+        <div style={styles.header}>
+          <h2>Documentos</h2>
+          <button type="button" onClick={onRefresh} style={styles.refreshButton}>
+            Atualizar
+          </button>
+        </div>
+        <p>Nenhum documento enviado ainda.</p>
+      </section>
+    );
   }
 
   return (
-    <table>
-      <thead>
-        <tr>
-          <th>Nome</th>
-          <th>Tamanho</th>
-          <th>Enviado em</th>
-          <th>Dono</th>
-          <th>Ação</th>
-        </tr>
-      </thead>
-      <tbody>
-        {documents.map((doc) => (
-          <tr key={doc.id}>
-            <td>{doc.originalName}</td>
-            <td>{formatSize(doc.size)}</td>
-            <td>{new Date(doc.uploadedAt).toLocaleString('pt-BR')}</td>
-            <td>{doc.owner || '-'}</td>
-            <td>
-              <DownloadButton documentId={doc.id} fileName={doc.originalName} />
-            </td>
-          </tr>
+    <section style={styles.section}>
+      <div style={styles.header}>
+        <h2>Documentos</h2>
+        <button type="button" onClick={onRefresh} style={styles.refreshButton}>
+          Atualizar
+        </button>
+      </div>
+
+      <ul style={styles.list}>
+        {documents.map((document) => (
+          <li key={document.id} style={styles.item}>
+            <div>
+              <strong>{document.originalName}</strong>
+              <div style={styles.meta}>
+                <span>Tamanho: {formatSize(document.size)}</span>
+                <span>Enviado em: {new Date(document.uploadedAt).toLocaleString('pt-BR')}</span>
+                <span>Dono: {document.owner || '-'}</span>
+              </div>
+            </div>
+
+            <DownloadButton documentId={document.id} documentName={document.originalName} />
+          </li>
         ))}
-      </tbody>
-    </table>
+      </ul>
+    </section>
   );
 }
+
+const styles = {
+  section: {
+    border: '1px solid #dfe3e8',
+    borderRadius: '12px',
+    padding: '1rem',
+    background: '#fff',
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '1rem',
+    gap: '1rem',
+  },
+  refreshButton: {
+    border: '1px solid #cbd5e1',
+    borderRadius: '8px',
+    padding: '0.5rem 0.75rem',
+    background: '#f8fafc',
+    cursor: 'pointer',
+  },
+  list: {
+    listStyle: 'none',
+    padding: 0,
+    margin: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.75rem',
+  },
+  item: {
+    border: '1px solid #e2e8f0',
+    borderRadius: '10px',
+    padding: '0.75rem',
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: '1rem',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  meta: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.2rem',
+    color: '#475569',
+    fontSize: '0.85rem',
+    marginTop: '0.35rem',
+  },
+};
