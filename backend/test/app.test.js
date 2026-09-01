@@ -65,3 +65,16 @@ test('deve permitir upload, listagem e download de documentos', async () => {
     assert.strictEqual(await downloadResponse.text(), 'conteudo do documento');
   });
 });
+
+test('deve retornar erro 400 ao tentar upload sem arquivo', async () => {
+  await withServer(async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/upload`, {
+      method: 'POST',
+      body: new FormData(),
+    });
+
+    assert.strictEqual(response.status, 400);
+    const data = await response.json();
+    assert.ok(data.message);
+  });
+});

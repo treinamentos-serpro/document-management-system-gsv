@@ -1,9 +1,5 @@
 import DownloadButton from './DownloadButton.jsx';
-
-function formatSize(bytes) {
-  if (bytes < 1024) return `${bytes} B`;
-  return `${(bytes / 1024).toFixed(1)} KB`;
-}
+import { formatFileSize } from '../utils/formatters.js';
 
 export default function DocumentList({ documents, onRefresh }) {
   if (!documents.length) {
@@ -35,7 +31,7 @@ export default function DocumentList({ documents, onRefresh }) {
             <div>
               <strong>{document.originalName}</strong>
               <div style={styles.meta}>
-                <span>Tamanho: {formatSize(document.size)}</span>
+                <span>Tamanho: {formatFileSize(document.size)}</span>
                 <span>Enviado em: {new Date(document.uploadedAt).toLocaleString('pt-BR')}</span>
                 <span>Dono: {document.owner || '-'}</span>
               </div>

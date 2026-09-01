@@ -1,23 +1,20 @@
 // Rotas de documentos: definem os endpoints e delegam para os controllers.
 // Upload usa multer com diskStorage, gravando os arquivos em backend/storage.
 
-const fs = require('node:fs');
 const path = require('node:path');
 const { Router } = require('express');
 const multer = require('multer');
 const documentController = require('../controllers/documentController');
-
-const storageDir = path.join(__dirname, '..', '..', 'storage');
-fs.mkdirSync(storageDir, { recursive: true });
+const { STORAGE_DIR } = require('../repositories/documentRepository');
 
 const storage = multer.diskStorage({
   destination: (_req, _file, callback) => {
-    callback(null, storageDir);
+    callback(null, STORAGE_DIR);
   },
   filename: (_req, file, callback) => {
     const extension = path.extname(file.originalname || 'upload');
-    const baseName = path.basename(file.originalname || 'upload', extension);
-    callback(null, `${Date.now()}-${baseName}${extension}`);
+    const baseName = path.basename(file.originalname || 'upload', extension).replace(/[^a-zA-Z0-9_.-]/g, '_');
+    callback(null, `temp-${Date.now()}-${baseName}${extension}`);
   },
 });
 

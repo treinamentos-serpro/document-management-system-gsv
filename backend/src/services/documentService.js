@@ -5,10 +5,19 @@ const path = require('node:path');
 const fs = require('node:fs');
 const repository = require('../repositories/documentRepository');
 
-const STORAGE_DIR = path.join(__dirname, '..', '..', 'storage');
+function sanitizeFileName(fileName) {
+  if (!fileName) return 'file';
+  return path.basename(fileName).replace(/[^a-zA-Z0-9_.-]/g, '_');
+}
 
-function ensureStorageDir() {
-  fs.mkdirSync(STORAGE_DIR, { recursive: true });
+function cleanupTempFile(filePath) {
+  if (filePath && fs.existsSync(filePath)) {
+    try {
+      fs.unlinkSync(filePath);
+    } catch {
+      // Ignora erro ao remover arquivo temporário durante tratamento de exceção
+    }
+  }
 }
 
 function uploadDocument(file, owner = 'anonymous') {
@@ -18,40 +27,43 @@ function uploadDocument(file, owner = 'anonymous') {
     throw error;
   }
 
-  ensureStorageDir();
-
+  const safeOriginalName = sanitizeFileName(file.originalname);
   const id = crypto.randomUUID();
   const timestamp = new Date().toISOString();
-  const storedName = `${id}-${file.originalname}`;
-  const filePath = path.join(STORAGE_DIR, storedName);
+  const storedName = `${id}-${safeOriginalName}`;
 
-  fs.renameSync(file.path, filePath);
+  try {
+    const filePath = repository.moveFileToStorage(file.path, storedName);
 
-  const document = {
-    id,
-    originalName: file.originalname,
-    storedName,
-    filePath,
-    size: file.size,
-    uploadedAt: timestamp,
-    owner,
-    contentType: file.mimetype || 'application/octet-stream',
-  };
+    const document = {
+      id,
+      originalName: file.originalname,
+      storedName,
+      filePath,
+      size: file.size,
+      uploadedAt: timestamp,
+      owner: owner || 'anonymous',
+      contentType: file.mimetype || 'application/octet-stream',
+    };
 
-  repository.saveDocument(document);
+    repository.saveDocument(document);
 
-  return {
-    id: document.id,
-    originalName: document.originalName,
-    size: document.size,
-    uploadedAt: document.uploadedAt,
-    owner: document.owner,
-    storedName: document.storedName,
-  };
+    return {
+      id: document.id,
+      originalName: document.originalName,
+      size: document.size,
+      uploadedAt: document.uploadedAt,
+      owner: document.owner,
+      storedName: document.storedName,
+    };
+  } catch (error) {
+    cleanupTempFile(file.path);
+    throw error;
+  }
 }
 
-function listDocuments() {
-  return repository.listDocuments();
+function listDocuments(owner) {
+  return repository.listDocuments(owner);
 }
 
 function getDocumentById(id) {
